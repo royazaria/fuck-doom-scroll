@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "F*CK Doom Scroll",
+  "version": "1.0.0",
+  "description": "Blocks Facebook, Instagram, YouTube after 2.5 min of active scrolling",
+  "permissions": ["tabs", "scripting", "storage"],
+  "host_permissions": [
+    "https://*.facebook.com/*",
+    "https://*.instagram.com/*",
+    "https://*.youtube.com/*",
+    "http://localhost:7331/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.facebook.com/*",
+        "https://*.instagram.com/*",
+        "https://*.youtube.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Blocked — F*CK Doom Scroll</title>
+  <style>
+    body {
+      background: #111;
+      color: white;
+      font-family: Arial Black, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    h1 { font-size: 2.5rem; color: #ff4444; margin-bottom: 1rem; }
+    p  { font-size: 1.2rem; color: #aaa; max-width: 500px; }
+    button {
+      margin-top: 2rem;
+      padding: 1rem 2rem;
+      font-size: 1rem;
+      background: #333;
+      color: white;
+      border: 1px solid #555;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover { background: #444; }
+  </style>
+</head>
+<body>
+  <h1>🚫 Scroll Limit Reached</h1>
+  <p>You've been actively scrolling for too long. A 60-second pause is required.</p>
+  <p>The desktop app is showing your countdown. Come back when it's done.</p>
+  <button onclick="window.history.back()">← Go back</button>
+</body>
+</html>
