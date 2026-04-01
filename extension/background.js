@@ -17,6 +17,17 @@ function getSite(url) {
   } catch { return ""; }
 }
 
+// ── Receive scroll pings from content script and forward to server ──────────
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type !== "scroll") return;
+  fetch(`${SERVER}/scroll`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ site: msg.site, active_seconds: msg.active_seconds }),
+  }).catch(() => {});
+});
+
+// ── Poll server and redirect blocked tabs ───────────────────────────────────
 async function checkAndBlock() {
   const tabs = await chrome.tabs.query({ active: true });
   for (const tab of tabs) {
@@ -26,9 +37,7 @@ async function checkAndBlock() {
       const r = await fetch(`${SERVER}/status?site=${site}`);
       const { blocked } = await r.json();
       if (blocked && !tab.url.includes("blocked.html")) {
-        chrome.tabs.update(tab.id, {
-          url: chrome.runtime.getURL("blocked.html"),
-        });
+        chrome.tabs.update(tab.id, { url: chrome.runtime.getURL("blocked.html") });
       }
     } catch (_) {}
   }
@@ -43,9 +52,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       .then(r => r.json())
       .then(({ blocked }) => {
         if (blocked) {
-          chrome.tabs.update(tabId, {
-            url: chrome.runtime.getURL("blocked.html"),
-          });
+          chrome.tabs.update(tabId, { url: chrome.runtime.getURL("blocked.html") });
         }
       })
       .catch(() => {});

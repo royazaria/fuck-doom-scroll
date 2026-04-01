@@ -1,40 +1,27 @@
 // F*CK Doom Scroll — content script
-// Strategy:
-//   YouTube Shorts  → count TIME on /shorts/ URL (watching = doom scrolling)
-//   Facebook/Instagram → count SCROLL VELOCITY (only block if actively scrolling)
+// Sends scroll/time data via chrome.runtime.sendMessage to background.js
+// (background service worker makes the actual fetch — bypasses mixed-content block)
 
-const SERVER = "http://localhost:7331";
 const REPORT_INTERVAL_MS = 2000;
-
 const host = location.hostname.replace("www.", "");
 const isYouTube = host === "youtube.com" || host === "m.youtube.com";
 
-// ── YouTube Shorts: time-based ──────────────────────────────────────────────
-
-function isOnShorts() {
-  return isYouTube && location.pathname.startsWith("/shorts");
+function ping(site, active_seconds) {
+  chrome.runtime.sendMessage({ type: "scroll", site, active_seconds });
 }
 
+// ── YouTube Shorts: time-based ──────────────────────────────────────────────
 if (isYouTube) {
   setInterval(() => {
-    if (!isOnShorts()) return;
-    if (document.hidden) return; // tab not focused — don't count
-    fetch(`${SERVER}/scroll`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ site: "youtube.com", active_seconds: REPORT_INTERVAL_MS / 1000 }),
-    }).catch(() => {});
+    if (!location.pathname.startsWith("/shorts")) return;
+    if (document.hidden) return;
+    ping("youtube.com", REPORT_INTERVAL_MS / 1000);
   }, REPORT_INTERVAL_MS);
-
-  // Handle YouTube SPA navigation
-  window.addEventListener("yt-navigate-finish", () => { /* no-op, isOnShorts() re-checks */ });
 }
 
 // ── Facebook / Instagram: scroll-velocity-based ─────────────────────────────
-
 if (!isYouTube) {
   let scrollCount = 0;
-
   window.addEventListener("scroll",    () => scrollCount++, { passive: true, capture: true });
   window.addEventListener("wheel",     () => scrollCount++, { passive: true, capture: true });
   window.addEventListener("touchmove", () => scrollCount++, { passive: true, capture: true });
@@ -44,11 +31,7 @@ if (!isYouTube) {
     const eventsPerSecond = scrollCount / (REPORT_INTERVAL_MS / 1000);
     scrollCount = 0;
     if (eventsPerSecond >= 1) {
-      fetch(`${SERVER}/scroll`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ site: host, active_seconds: REPORT_INTERVAL_MS / 1000 }),
-      }).catch(() => {});
+      ping(host, REPORT_INTERVAL_MS / 1000);
     }
   }, REPORT_INTERVAL_MS);
 }
