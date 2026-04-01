@@ -53,17 +53,21 @@ def start_server():
     uvicorn.run(fastapi_app, host="127.0.0.1", port=SERVER_PORT, log_level="warning")
 
 def main():
-    print("F*CK Doom Scroll starting...")
-    server_thread = threading.Thread(target=start_server, daemon=True)
-    server_thread.start()
+    import sys, os, traceback
+    log_path = os.path.join(os.path.expanduser("~"), "ScrollBlocker.log")
+    try:
+        server_thread = threading.Thread(target=start_server, daemon=True)
+        server_thread.start()
 
-    if not autostart.is_installed():
-        autostart.install()
-        print("Added to Windows startup")
+        if not autostart.is_installed():
+            autostart.install()
 
-    run_tray(on_quit=lambda: exit(0))
-    print(f"Running on localhost:{SERVER_PORT} — tray icon active")
-    server_thread.join()
+        run_tray(on_quit=lambda: exit(0))
+        server_thread.join()
+    except Exception:
+        with open(log_path, "w") as f:
+            traceback.print_exc(file=f)
+        raise
 
 if __name__ == "__main__":
     main()
