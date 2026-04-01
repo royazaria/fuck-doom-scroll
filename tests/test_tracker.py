@@ -27,3 +27,17 @@ def test_unblock_resets_accumulator():
     t.unblock("youtube.com")
     assert t.is_blocked("youtube.com") is False
     assert t.get_accumulated("youtube.com") == 0
+
+def test_progressive_countdown():
+    t = ScrollTracker(threshold=10, cooldown=5)
+    # First block: base seconds
+    t.record_scroll("youtube.com", active_seconds=11)
+    assert t.get_countdown_seconds("youtube.com", 60) == 60
+    t.unblock("youtube.com")
+    # Second block: base + 60
+    t.record_scroll("youtube.com", active_seconds=11)
+    assert t.get_countdown_seconds("youtube.com", 60) == 120
+    t.unblock("youtube.com")
+    # Third block: base + 120
+    t.record_scroll("youtube.com", active_seconds=11)
+    assert t.get_countdown_seconds("youtube.com", 60) == 180

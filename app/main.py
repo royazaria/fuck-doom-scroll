@@ -32,7 +32,8 @@ def on_block_triggered(site: str):
             tracker.unblock(site)
             with _countdown_lock:
                 _countdown_active = False
-        show_countdown(COUNTDOWN_SECONDS, on_complete=on_done)
+        duration = tracker.get_countdown_seconds(site, COUNTDOWN_SECONDS)
+        show_countdown(duration, on_complete=on_done)
 
     threading.Thread(target=_run, daemon=False).start()
 
