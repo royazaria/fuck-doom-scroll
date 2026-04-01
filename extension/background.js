@@ -1,23 +1,42 @@
 const SERVER = "http://localhost:7331";
-const POLL_MS = 2000;
 
-const BLOCKED_PATTERNS = [
-  /facebook\.com/,
-  /instagram\.com/,
-  /youtube\.com/,
-];
+const BLOCKED_PATTERNS = [/facebook\.com/, /instagram\.com/, /youtube\.com/];
 
 function isBlockedSite(url) {
-  return BLOCKED_PATTERNS.some(p => p.test(url));
+  return url && BLOCKED_PATTERNS.some(p => p.test(url));
 }
 
 function getSite(url) {
-  try {
-    return new URL(url).hostname.replace("www.", "");
-  } catch { return ""; }
+  try { return new URL(url).hostname.replace("www.", ""); } catch { return ""; }
 }
 
-// ── Receive scroll pings from content script and forward to server ──────────
+// ── Keep service worker alive ────────────────────────────────────────────────
+chrome.alarms.create("keepAlive", { periodInMinutes: 0.4 }); // every ~24s
+chrome.alarms.create("checkBlock", { periodInMinutes: 0.033 }); // every ~2s
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "checkBlock") checkAndBlock();
+  // keepAlive just wakes the service worker
+});
+
+// ── Inject content script into existing open tabs on extension load ──────────
+chrome.runtime.onInstalled.addListener(async () => {
+  const tabs = await chrome.tabs.query({
+    url: [
+      "https://*.facebook.com/*",
+      "https://*.instagram.com/*",
+      "https://*.youtube.com/*",
+    ]
+  });
+  for (const tab of tabs) {
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content.js"],
+    }).catch(() => {});
+  }
+});
+
+// ── Receive scroll pings from content script ─────────────────────────────────
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type !== "scroll") return;
   fetch(`${SERVER}/scroll`, {
@@ -27,34 +46,32 @@ chrome.runtime.onMessage.addListener((msg) => {
   }).catch(() => {});
 });
 
-// ── Poll server and redirect blocked tabs ───────────────────────────────────
+// ── Poll server and redirect blocked tabs ────────────────────────────────────
 async function checkAndBlock() {
-  const tabs = await chrome.tabs.query({ active: true });
+  let tabs;
+  try { tabs = await chrome.tabs.query({ active: true }); } catch { return; }
   for (const tab of tabs) {
-    if (!tab.url || !isBlockedSite(tab.url)) continue;
+    if (!isBlockedSite(tab.url)) continue;
+    if (tab.url.includes("blocked.html")) continue;
     const site = getSite(tab.url);
     try {
       const r = await fetch(`${SERVER}/status?site=${site}`);
       const { blocked } = await r.json();
-      if (blocked && !tab.url.includes("blocked.html")) {
+      if (blocked) {
         chrome.tabs.update(tab.id, { url: chrome.runtime.getURL("blocked.html") });
       }
     } catch (_) {}
   }
 }
 
-setInterval(checkAndBlock, POLL_MS);
-
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && tab.url && isBlockedSite(tab.url)) {
-    const site = getSite(tab.url);
-    fetch(`${SERVER}/status?site=${site}`)
-      .then(r => r.json())
-      .then(({ blocked }) => {
-        if (blocked) {
-          chrome.tabs.update(tabId, { url: chrome.runtime.getURL("blocked.html") });
-        }
-      })
-      .catch(() => {});
-  }
+  if (changeInfo.status !== "complete") return;
+  if (!isBlockedSite(tab.url) || tab.url.includes("blocked.html")) return;
+  const site = getSite(tab.url);
+  fetch(`${SERVER}/status?site=${site}`)
+    .then(r => r.json())
+    .then(({ blocked }) => {
+      if (blocked) chrome.tabs.update(tabId, { url: chrome.runtime.getURL("blocked.html") });
+    })
+    .catch(() => {});
 });

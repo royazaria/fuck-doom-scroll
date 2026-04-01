@@ -1,5 +1,15 @@
 import pytest
+import tempfile
+import os
+import app.tracker as tracker_module
 from app.tracker import ScrollTracker
+
+@pytest.fixture(autouse=True)
+def tmp_state_file(tmp_path):
+    original = tracker_module.STATE_FILE
+    tracker_module.STATE_FILE = str(tmp_path / "state.json")
+    yield
+    tracker_module.STATE_FILE = original
 
 def test_fresh_tracker_not_blocked():
     t = ScrollTracker(threshold=10, cooldown=5)
