@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Blocked — F*CK Doom Scroll</title>
+  <style>
+    body {
+      background: #111;
+      color: white;
+      font-family: Arial Black, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    h1 { font-size: 2.5rem; color: #ff4444; margin-bottom: 1rem; }
+    p  { font-size: 1.2rem; color: #aaa; max-width: 500px; }
+    #status { font-size: 1rem; color: #666; margin-top: 2rem; }
+    #done-msg { display: none; margin-top: 2rem; }
+    #done-msg p { color: #44ff88; }
+    button {
+      margin-top: 1rem;
+      padding: 1rem 2rem;
+      font-size: 1rem;
+      background: #222;
+      color: #44ff88;
+      border: 1px solid #44ff88;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover { background: #2a3a2a; }
+  </style>
+</head>
+<body>
+  <h1>🚫 Scroll Limit Reached</h1>
+  <p>You've been doom scrolling too long. Put your phone down.</p>
+  <p>Watch the countdown on your desktop — then you can come back.</p>
+  <div id="status">Checking status...</div>
+
+  <div id="done-msg">
+    <p>✅ Countdown finished. You can go back now.</p>
+    <button onclick="history.back()">← Go back</button>
+  </div>
+
+  <script>
+    const SERVER = "http://localhost:7331";
+    const params = new URLSearchParams(location.search);
+    // Get site from referrer or query param
+    let site = params.get("site");
+    if (!site) {
+      try {
+        const ref = document.referrer || "";
+        site = new URL(ref).hostname.replace("www.", "");
+      } catch(_) {}
+    }
+    if (!site) site = "unknown";
+
+    const statusEl = document.getElementById("status");
+    const doneEl = document.getElementById("done-msg");
+
+    function check() {
+      fetch(`${SERVER}/status?site=${site}`)
+        .then(r => r.json())
+        .then(({ blocked }) => {
+          if (!blocked) {
+            statusEl.style.display = "none";
+            doneEl.style.display = "block";
+          } else {
+            statusEl.textContent = "Countdown running on your desktop...";
+            setTimeout(check, 2000);
+          }
+        })
+        .catch(() => {
+          statusEl.textContent = "App not running — close this tab.";
+        });
+    }
+
+    check();
+  </script>
+</body>
+</html>
