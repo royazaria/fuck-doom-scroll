@@ -1,8 +1,22 @@
+import sys, os
+
+# ── Null-stream guard (must be FIRST — before uvicorn import) ─────────────────
+# pythonw.exe sets sys.stdout/stderr to None; uvicorn's ColourizedFormatter
+# calls sys.stdout.isatty() at import time → AttributeError → silent crash.
+class _NullStream:
+    encoding = "utf-8"; errors = "replace"
+    def write(self, *a, **kw): pass
+    def flush(self, *a, **kw): pass
+    def isatty(self): return False
+    def fileno(self): raise OSError("not a real file")
+
+if sys.stdout is None: sys.stdout = _NullStream()
+if sys.stderr is None: sys.stderr = _NullStream()
+
 import threading
 import queue
 import time
 import ctypes
-import os
 import traceback
 import uvicorn
 from app.config import SERVER_PORT, ACTIVE_SCROLL_THRESHOLD_SECONDS, COUNTDOWN_SECONDS
@@ -62,10 +76,28 @@ fastapi_app = create_app(tracker)
 
 # ── Server — if it dies, crash the whole process so watchdog restarts ─────────
 def start_server():
+    # Wait for any previous instance to release the port (up to 10s)
+    import socket
+    for _ in range(10):
+        try:
+            s = socket.socket()
+            s.settimeout(0.5)
+            s.connect(("127.0.0.1", SERVER_PORT))
+            s.close()
+            time.sleep(1)  # port still in use — wait
+        except OSError:
+            break  # port free, proceed
     try:
-        uvicorn.run(fastapi_app, host="127.0.0.1", port=SERVER_PORT, log_config=None)
+        uvicorn.run(
+            fastapi_app,
+            host="127.0.0.1",
+            port=SERVER_PORT,
+            log_config=None,
+            use_colors=False,
+            access_log=False,
+        )
     except Exception:
-        with open(LOG_PATH, "w") as f:
+        with open(LOG_PATH, "a") as f:
             traceback.print_exc(file=f)
     finally:
         os._exit(1)  # force watchdog to restart everything
@@ -107,7 +139,7 @@ def main():
                 on_done()  # unblock even if countdown crashes
 
     except Exception:
-        with open(LOG_PATH, "w") as f:
+        with open(LOG_PATH, "a") as f:
             traceback.print_exc(file=f)
         os._exit(1)
 

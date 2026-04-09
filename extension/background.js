@@ -64,10 +64,25 @@ async function checkAndBlock() {
   }
 }
 
+// ── Reinject content script on navigation (SPA + full loads) ─────────────────
+// changeInfo.url fires on SPA navigation (FB/IG never do full page loads)
+// changeInfo.status === "complete" fires on full loads
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status !== "complete") return;
-  if (!isBlockedSite(tab.url) || tab.url.includes("blocked.html")) return;
-  const site = getSite(tab.url);
+  const url = changeInfo.url || (changeInfo.status === "complete" ? tab.url : null);
+  if (!url) return;
+  if (!isBlockedSite(url) || url.includes("blocked.html")) return;
+
+  const site = getSite(url);
+
+  // Reinject content script so scroll tracking works after navigation
+  if (changeInfo.url) {
+    chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content.js"],
+    }).catch(() => {});
+  }
+
+  // Check if already blocked and redirect
   fetch(`${SERVER}/status?site=${site}`)
     .then(r => r.json())
     .then(({ blocked }) => {
